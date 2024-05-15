@@ -1,12 +1,9 @@
 package experiment
 
 import (
-	"encoding/csv"
 	"fmt"
-	"log"
 	"math"
 	"math/rand"
-	"os"
 	"strings"
 	"sync"
 
@@ -14,14 +11,12 @@ import (
 )
 
 type experiment struct {
-	points_file  *os.File
-	results_file *os.File
-	r            uint8
-	k            uint16
-	seed         uint32
-	radius       float64
-	wg           *sync.WaitGroup
-	mutex        *sync.Mutex
+	r      uint8
+	k      uint16
+	seed   uint32
+	radius float64
+	wg     *sync.WaitGroup
+	mutex  *sync.Mutex
 }
 
 type sample struct {
@@ -35,7 +30,7 @@ func (s *sample) inValid(radius float64) bool {
 	return s.distanceToCenter <= radius
 }
 
-func Run(k uint16, r uint8, seed uint32, radius float64, wg *sync.WaitGroup, points_file *os.File, results_file *os.File) {
+func Run(k uint16, r uint8, seed uint32, radius float64, wg *sync.WaitGroup, pointsRegisters *[][]string, resultsRegisters *[][]string) {
 	defer wg.Done()
 
 	numberOfRuns := int(math.Pow10(int(r)))
@@ -45,25 +40,52 @@ func Run(k uint16, r uint8, seed uint32, radius float64, wg *sync.WaitGroup, poi
 
 	wgRuns.Add(numberOfRuns)
 
+	PRChannel := make(chan []string)
+	RRChannel := make(chan []string)
+
 	for i := 0; i < numberOfRuns; i++ {
 		current := experiment{
-			points_file:  points_file,
-			results_file: results_file,
-			r:            r,
-			k:            k,
-			seed:         seed,
-			radius:       radius,
-			wg:           &wgRuns,
-			mutex:        &mutexRuns,
+			r:      r,
+			k:      k,
+			seed:   seed,
+			radius: radius,
+			wg:     &wgRuns,
+			mutex:  &mutexRuns,
 		}
 
-		go current.Run()
+		go current.Run(PRChannel, RRChannel)
 	}
 
-	wgRuns.Wait()
+	// Wait for all goroutines to finish
+	go func() {
+		wgRuns.Wait()
+		close(PRChannel)
+		close(RRChannel)
+	}()
+
+	wgCollectors := sync.WaitGroup{}
+
+	wgCollectors.Add(2)
+
+	go func() {
+		for point := range PRChannel {
+			*pointsRegisters = append(*pointsRegisters, point)
+		}
+		wgCollectors.Done()
+	}()
+
+	go func() {
+		for result := range RRChannel {
+			*resultsRegisters = append(*resultsRegisters, result)
+		}
+
+		wgCollectors.Done()
+	}()
+
+	wgCollectors.Wait()
 }
 
-func (e *experiment) Run() {
+func (e *experiment) Run(pointsRegisters chan []string, resultsRegisters chan []string) {
 	defer e.wg.Done()
 
 	distances := make([]*sample, e.k)
@@ -114,10 +136,6 @@ func (e *experiment) Run() {
 	variance := sumLocalVariation / (float64(e.k) - 1)
 	stdDeviation := math.Sqrt(variance)
 
-	e.mutex.Lock()
-	pointsWriter := csv.NewWriter(e.points_file)
-	resultsWriter := csv.NewWriter(e.results_file)
-
 	for i := range distances {
 		csv_string := fmt.Sprintf("%d,%d,%d,%f,%d,%f,%f,%f",
 			1,
@@ -130,15 +148,10 @@ func (e *experiment) Run() {
 			distances[i].distanceToCenter,
 		)
 
-		err := pointsWriter.Write(strings.Split(csv_string, ","))
+		register := strings.Split(csv_string, ",")
 
-		if err != nil {
-			log.Println("Unable to write point line on points file: ", err)
-			continue
-		}
+		pointsRegisters <- register
 	}
-
-	pointsWriter.Flush()
 
 	csv_string := fmt.Sprintf("%d,%d,%d,%f,%d,%f,%f,%f",
 		1,
@@ -151,13 +164,5 @@ func (e *experiment) Run() {
 		stdDeviation,
 	)
 
-	err := resultsWriter.Write(strings.Split(csv_string, ","))
-
-	if err != nil {
-		log.Println("Unable to write simulation result line on results file: ", err)
-	}
-
-	resultsWriter.Flush()
-
-	e.mutex.Unlock()
+	resultsRegisters <- strings.Split(csv_string, ",")
 }

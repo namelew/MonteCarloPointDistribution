@@ -57,6 +57,9 @@ func main() {
 		log.Fatal("Unable to write point line on points file: ", err)
 	}
 
+	pointsRegisters := make([][]string, 0)
+	resultsRegisters := make([][]string, 0)
+
 	for i := 0; i < int(*powOfExperiments); i++ {
 		go experiment.Run(
 			uint16(*numberOfPoints),
@@ -64,10 +67,28 @@ func main() {
 			uint32(*seed),
 			*radius,
 			&wg,
-			points_file,
-			results_file,
+			&pointsRegisters,
+			&resultsRegisters,
 		)
 	}
 
 	wg.Wait()
+
+	err = pointsWriter.WriteAll(pointsRegisters)
+
+	if err != nil {
+		log.Fatal("Unable to write point line on points file: ", err)
+		return
+	}
+
+	pointsWriter.Flush()
+
+	err = resultsWriter.WriteAll(resultsRegisters)
+
+	if err != nil {
+		log.Fatal("Unable to write point line on points file: ", err)
+		return
+	}
+
+	resultsWriter.Flush()
 }
