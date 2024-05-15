@@ -60,6 +60,9 @@ func main() {
 	pointsRegisters := make([][]string, 0)
 	resultsRegisters := make([][]string, 0)
 
+	PRChannel := make(chan []string)
+	RRChannel := make(chan []string)
+
 	for i := 0; i < int(*powOfExperiments); i++ {
 		go experiment.Run(
 			uint16(*numberOfPoints),
@@ -67,12 +70,37 @@ func main() {
 			uint32(*seed),
 			*radius,
 			&wg,
-			&pointsRegisters,
-			&resultsRegisters,
+			PRChannel,
+			RRChannel,
 		)
 	}
 
-	wg.Wait()
+	go func() {
+		wg.Wait()
+		close(PRChannel)
+		close(RRChannel)
+	}()
+
+	wgCollectors := sync.WaitGroup{}
+
+	wgCollectors.Add(2)
+
+	go func() {
+		for point := range PRChannel {
+			pointsRegisters = append(pointsRegisters, point)
+		}
+		wgCollectors.Done()
+	}()
+
+	go func() {
+		for result := range RRChannel {
+			resultsRegisters = append(resultsRegisters, result)
+		}
+
+		wgCollectors.Done()
+	}()
+
+	wgCollectors.Wait()
 
 	err = pointsWriter.WriteAll(pointsRegisters)
 

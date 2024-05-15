@@ -30,7 +30,7 @@ func (s *sample) inValid(radius float64) bool {
 	return s.distanceToCenter <= radius
 }
 
-func Run(k uint16, r uint8, seed uint32, radius float64, wg *sync.WaitGroup, pointsRegisters *[][]string, resultsRegisters *[][]string) {
+func Run(k uint16, r uint8, seed uint32, radius float64, wg *sync.WaitGroup, PRChannel chan []string, RRChannel chan []string) {
 	defer wg.Done()
 
 	numberOfRuns := int(math.Pow10(int(r)))
@@ -39,9 +39,6 @@ func Run(k uint16, r uint8, seed uint32, radius float64, wg *sync.WaitGroup, poi
 	mutexRuns := sync.Mutex{}
 
 	wgRuns.Add(numberOfRuns)
-
-	PRChannel := make(chan []string)
-	RRChannel := make(chan []string)
 
 	for i := 0; i < numberOfRuns; i++ {
 		current := experiment{
@@ -56,33 +53,7 @@ func Run(k uint16, r uint8, seed uint32, radius float64, wg *sync.WaitGroup, poi
 		go current.Run(PRChannel, RRChannel)
 	}
 
-	// Wait for all goroutines to finish
-	go func() {
-		wgRuns.Wait()
-		close(PRChannel)
-		close(RRChannel)
-	}()
-
-	wgCollectors := sync.WaitGroup{}
-
-	wgCollectors.Add(2)
-
-	go func() {
-		for point := range PRChannel {
-			*pointsRegisters = append(*pointsRegisters, point)
-		}
-		wgCollectors.Done()
-	}()
-
-	go func() {
-		for result := range RRChannel {
-			*resultsRegisters = append(*resultsRegisters, result)
-		}
-
-		wgCollectors.Done()
-	}()
-
-	wgCollectors.Wait()
+	wgRuns.Wait()
 }
 
 func (e *experiment) Run(pointsRegisters chan []string, resultsRegisters chan []string) {
