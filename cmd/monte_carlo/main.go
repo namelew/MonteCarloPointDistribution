@@ -29,17 +29,17 @@ func main() {
 
 	wg.Add(int(*powOfExperiments))
 
-	result_filename := "monte-carlo-simulation-results-%d_%d_%d_%2f.csv"
+	result_filename := "monte-carlo-simulation-results-%d_%d_%d_%d_%2f.csv"
 
-	results_file, err := os.Create(fmt.Sprintf(result_filename, *seed, *numberOfPoints, *powOfExperiments, *radius))
+	results_file, err := os.Create(fmt.Sprintf(result_filename, *coordinationsType, *seed, *numberOfPoints, *powOfExperiments, *radius))
 
 	if err != nil {
 		log.Fatal("Unable to create simulation results file: ", err)
 	}
 
-	points_filename := "monte-carlo-simulation-points-%d_%d_%d_%2f.csv"
+	points_filename := "monte-carlo-simulation-points-%d_%d_%d_%d_%2f.csv"
 
-	points_file, err := os.Create(fmt.Sprintf(points_filename, *seed, *numberOfPoints, *powOfExperiments, *radius))
+	points_file, err := os.Create(fmt.Sprintf(points_filename, *coordinationsType, *seed, *numberOfPoints, *powOfExperiments, *radius))
 
 	if err != nil {
 		log.Fatal("Unable to create simulation points file: ", err)

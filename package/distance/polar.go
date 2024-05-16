@@ -6,7 +6,7 @@ import (
 )
 
 func PolarPoint(random *rand.Rand, r, a, b float64) Point {
-	randomRadius := r * math.Sqrt(random.Float64())
+	randomRadius := r * random.Float64()
 	randomAngle := random.Float64() * 2 * math.Pi
 
 	x := a + randomRadius*math.Cos(randomAngle)

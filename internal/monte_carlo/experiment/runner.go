@@ -32,10 +32,6 @@ type sample struct {
 
 var CIRCLE_CENTER = distance.Point{X: 0, Y: 0}
 
-func (s *sample) inValid(radius float64) bool {
-	return s.distanceToCenter <= radius
-}
-
 func Run(global *GlobalOptions, r uint8, wg *sync.WaitGroup, PRChannel chan []string, RRChannel chan []string) {
 	defer wg.Done()
 
@@ -73,33 +69,12 @@ func (e *experiment) Run(rid int, pointsRegisters chan []string, resultsRegister
 		switch e.globalVars.CType {
 		case distance.EUCLIDIAN:
 			e.mutex.Lock()
-			point := distance.Point{
-				X: e.globalVars.RNG.Float64(),
-				Y: e.globalVars.RNG.Float64(),
-			}
+			point := distance.EuclidianPoint(e.globalVars.RNG, e.globalVars.Radius, CIRCLE_CENTER.X, CIRCLE_CENTER.Y)
 			e.mutex.Unlock()
 
 			new = sample{
 				Point:            point,
 				distanceToCenter: distance.EuclidianDistance(point, CIRCLE_CENTER),
-			}
-			// Validation Step
-			for {
-				if new.inValid(e.globalVars.Radius) {
-					break
-				}
-
-				e.mutex.Lock()
-				point := distance.Point{
-					X: e.globalVars.RNG.Float64(),
-					Y: e.globalVars.RNG.Float64(),
-				}
-				e.mutex.Unlock()
-
-				new = sample{
-					Point:            point,
-					distanceToCenter: distance.EuclidianDistance(point, CIRCLE_CENTER),
-				}
 			}
 		case distance.POLAR:
 			e.mutex.Lock()
