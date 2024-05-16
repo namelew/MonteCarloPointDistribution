@@ -5,17 +5,12 @@ import (
 	"math/rand"
 )
 
-type Point struct {
-	X float64
-	Y float64
-}
-
 func EuclidianPoint(random *rand.Rand, r, a, b float64) Point {
 	randomRadius := r * math.Sqrt(random.Float64())
 	randomAngle := random.Float64() * 2 * math.Pi
 
-	x := a + randomRadius*math.Cos(randomAngle)
-	y := b + randomRadius*math.Sin(randomAngle)
+	x := math.Sqrt(a) + randomRadius*math.Cos(randomAngle)
+	y := math.Sqrt(b) + randomRadius*math.Sin(randomAngle)
 
 	return Point{X: x, Y: y}
 }

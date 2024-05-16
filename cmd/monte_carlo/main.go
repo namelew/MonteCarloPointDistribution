@@ -11,14 +11,16 @@ import (
 	"time"
 
 	"github.com/namelew/MonteCarloPointDistribution/internal/monte_carlo/experiment"
+	"github.com/namelew/MonteCarloPointDistribution/package/distance"
 )
 
 func main() {
 	var (
-		numberOfPoints   = flag.Uint("k", 300, "Number of points that will be generate on each experiment")
-		powOfExperiments = flag.Uint("r", 6, "Greater exponent of the base 10 potency that set the number of runs on each experiment")
-		radius           = flag.Float64("radius", 0.5, "Radius of the ring that will contain all points")
-		seed             = flag.Uint("seed", uint(time.Now().Nanosecond()), "Seed value to generate the experiments")
+		numberOfPoints    = flag.Uint("k", 300, "Number of points that will be generate on each experiment")
+		coordinationsType = flag.Uint("t", uint(distance.EUCLIDIAN), "Type of coordinations that will be used to generate points in the circle")
+		powOfExperiments  = flag.Uint("r", 6, "Greater exponent of the base 10 potency that set the number of runs on each experiment")
+		radius            = flag.Float64("radius", 0.5, "Radius of the ring that will contain all points")
+		seed              = flag.Uint("seed", uint(time.Now().Nanosecond()), "Seed value to generate the experiments")
 	)
 
 	flag.Parse()
@@ -62,21 +64,49 @@ func main() {
 	resultsRegisters := make([][]string, 0)
 
 	random := rand.New(rand.NewSource(int64(*seed)))
+	PRChannel := make(chan []string)
+	RRChannel := make(chan []string)
 
 	for i := 0; i < int(*powOfExperiments); i++ {
 		go experiment.Run(
 			uint16(*numberOfPoints),
 			uint8(i+1),
 			uint32(*seed),
+			distance.CoordinationType(*coordinationsType),
 			*radius,
 			&wg,
-			&pointsRegisters,
-			&resultsRegisters,
+			PRChannel,
+			RRChannel,
 			random,
 		)
 	}
 
-	wg.Wait()
+	go func() {
+		wg.Wait()
+		close(PRChannel)
+		close(RRChannel)
+	}()
+
+	wgCollectors := sync.WaitGroup{}
+
+	wgCollectors.Add(2)
+
+	go func() {
+		for point := range PRChannel {
+			pointsRegisters = append(pointsRegisters, point)
+		}
+		wgCollectors.Done()
+	}()
+
+	go func() {
+		for result := range RRChannel {
+			resultsRegisters = append(resultsRegisters, result)
+		}
+
+		wgCollectors.Done()
+	}()
+
+	wgCollectors.Wait()
 
 	err = pointsWriter.WriteAll(pointsRegisters)
 

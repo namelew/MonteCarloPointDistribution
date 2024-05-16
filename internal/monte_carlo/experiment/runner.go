@@ -31,7 +31,7 @@ func (s *sample) inValid(radius float64) bool {
 	return s.distanceToCenter <= radius
 }
 
-func Run(k uint16, r uint8, seed uint32, radius float64, wg *sync.WaitGroup, pointsRegisters *[][]string, resultsRegisters *[][]string, randomNumberGenerator *rand.Rand) {
+func Run(k uint16, r uint8, seed uint32, ctype distance.CoordinationType,  radius float64, wg *sync.WaitGroup, PRChannel chan []string, RRChannel chan []string, randomNumberGenerator *rand.Rand) {
 	defer wg.Done()
 
 	numberOfRuns := int(math.Pow10(int(r)))
@@ -41,14 +41,12 @@ func Run(k uint16, r uint8, seed uint32, radius float64, wg *sync.WaitGroup, poi
 
 	wgRuns.Add(numberOfRuns)
 
-	PRChannel := make(chan []string)
-	RRChannel := make(chan []string)
-
 	for i := 0; i < numberOfRuns; i++ {
 		current := experiment{
 			r:                     r,
 			k:                     k,
 			seed:                  seed,
+			ctype:  ctype,
 			randomNumberGenerator: randomNumberGenerator,
 			radius:                radius,
 			wg:                    &wgRuns,
@@ -58,33 +56,7 @@ func Run(k uint16, r uint8, seed uint32, radius float64, wg *sync.WaitGroup, poi
 		go current.Run(PRChannel, RRChannel)
 	}
 
-	// Wait for all goroutines to finish
-	go func() {
-		wgRuns.Wait()
-		close(PRChannel)
-		close(RRChannel)
-	}()
-
-	wgCollectors := sync.WaitGroup{}
-
-	wgCollectors.Add(2)
-
-	go func() {
-		for point := range PRChannel {
-			*pointsRegisters = append(*pointsRegisters, point)
-		}
-		wgCollectors.Done()
-	}()
-
-	go func() {
-		for result := range RRChannel {
-			*resultsRegisters = append(*resultsRegisters, result)
-		}
-
-		wgCollectors.Done()
-	}()
-
-	wgCollectors.Wait()
+	wgRuns.Wait()
 }
 
 func (e *experiment) Run(pointsRegisters chan []string, resultsRegisters chan []string) {
@@ -109,11 +81,37 @@ func (e *experiment) Run(pointsRegisters chan []string, resultsRegisters chan []
 			if new.inValid(e.radius) {
 				break
 			}
+		var new sample
 
+		switch e.ctype {
+		case distance.EUCLIDIAN:
 			point := distance.Point{
 				X: e.randomNumberGenerator.Float64(),
 				Y: e.randomNumberGenerator.Float64(),
 			}
+
+			new = sample{
+				Point:            point,
+				distanceToCenter: distance.EuclidianDistance(point, CIRCLE_CENTER),
+			}
+			// Validation Step
+			for {
+				if new.inValid(e.radius) {
+					break
+				}
+
+				point := distance.Point{
+					X: randomNumberGenerator.Float64(),
+					Y: randomNumberGenerator.Float64(),
+				}
+
+				new = sample{
+					Point:            point,
+					distanceToCenter: distance.EuclidianDistance(point, CIRCLE_CENTER),
+				}
+			}
+		case distance.POLAR:
+			point := distance.PolarPoint(e.seed, e.radius, CIRCLE_CENTER.X, CIRCLE_CENTER.Y)
 
 			new = sample{
 				Point:            point,
