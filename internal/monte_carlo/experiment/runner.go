@@ -10,15 +10,19 @@ import (
 	"github.com/namelew/MonteCarloPointDistribution/package/distance"
 )
 
+type GlobalOptions struct {
+	NumberOfPoints uint16
+	Seed           uint32
+	Radius         float64
+	CType          distance.CoordinationType
+	RNG            *rand.Rand
+}
+
 type experiment struct {
-	r                     uint8
-	k                     uint16
-	seed                  uint32
-	ctype                 distance.CoordinationType
-	randomNumberGenerator *rand.Rand
-	radius                float64
-	wg                    *sync.WaitGroup
-	mutex                 *sync.Mutex
+	r          uint8
+	globalVars *GlobalOptions
+	wg         *sync.WaitGroup
+	mutex      *sync.Mutex
 }
 
 type sample struct {
@@ -32,7 +36,7 @@ func (s *sample) inValid(radius float64) bool {
 	return s.distanceToCenter <= radius
 }
 
-func Run(k uint16, r uint8, seed uint32, ctype distance.CoordinationType, radius float64, wg *sync.WaitGroup, PRChannel chan []string, RRChannel chan []string, rgn *rand.Rand) {
+func Run(global *GlobalOptions, r uint8, wg *sync.WaitGroup, PRChannel chan []string, RRChannel chan []string) {
 	defer wg.Done()
 
 	numberOfRuns := int(math.Pow10(int(r)))
@@ -43,14 +47,10 @@ func Run(k uint16, r uint8, seed uint32, ctype distance.CoordinationType, radius
 	wgRuns.Add(numberOfRuns)
 
 	current := experiment{
-		r:                     r,
-		k:                     k,
-		seed:                  seed,
-		ctype:                 ctype,
-		randomNumberGenerator: rgn,
-		radius:                radius,
-		wg:                    &wgRuns,
-		mutex:                 &mutexRuns,
+		r:          r,
+		globalVars: global,
+		wg:         &wgRuns,
+		mutex:      &mutexRuns,
 	}
 
 	for i := 0; i < numberOfRuns; i++ {
@@ -63,19 +63,19 @@ func Run(k uint16, r uint8, seed uint32, ctype distance.CoordinationType, radius
 func (e *experiment) Run(rid int, pointsRegisters chan []string, resultsRegisters chan []string) {
 	defer e.wg.Done()
 
-	distances := make([]*sample, e.k)
+	distances := make([]*sample, e.globalVars.NumberOfPoints)
 	var sumPointDistance float64 = 0
 
 	for i := range distances {
 
 		var new sample
 
-		switch e.ctype {
+		switch e.globalVars.CType {
 		case distance.EUCLIDIAN:
 			e.mutex.Lock()
 			point := distance.Point{
-				X: e.randomNumberGenerator.Float64(),
-				Y: e.randomNumberGenerator.Float64(),
+				X: e.globalVars.RNG.Float64(),
+				Y: e.globalVars.RNG.Float64(),
 			}
 			e.mutex.Unlock()
 
@@ -85,14 +85,14 @@ func (e *experiment) Run(rid int, pointsRegisters chan []string, resultsRegister
 			}
 			// Validation Step
 			for {
-				if new.inValid(e.radius) {
+				if new.inValid(e.globalVars.Radius) {
 					break
 				}
 
 				e.mutex.Lock()
 				point := distance.Point{
-					X: e.randomNumberGenerator.Float64(),
-					Y: e.randomNumberGenerator.Float64(),
+					X: e.globalVars.RNG.Float64(),
+					Y: e.globalVars.RNG.Float64(),
 				}
 				e.mutex.Unlock()
 
@@ -103,7 +103,7 @@ func (e *experiment) Run(rid int, pointsRegisters chan []string, resultsRegister
 			}
 		case distance.POLAR:
 			e.mutex.Lock()
-			point := distance.PolarPoint(e.randomNumberGenerator, e.radius, CIRCLE_CENTER.X, CIRCLE_CENTER.Y)
+			point := distance.PolarPoint(e.globalVars.RNG, e.globalVars.Radius, CIRCLE_CENTER.X, CIRCLE_CENTER.Y)
 			e.mutex.Unlock()
 
 			new = sample{
@@ -116,7 +116,7 @@ func (e *experiment) Run(rid int, pointsRegisters chan []string, resultsRegister
 		sumPointDistance += new.distanceToCenter
 	}
 
-	meanDistance := sumPointDistance / float64(e.k)
+	meanDistance := sumPointDistance / float64(e.globalVars.NumberOfPoints)
 
 	var sumLocalVariation float64 = 0.0
 
@@ -124,17 +124,17 @@ func (e *experiment) Run(rid int, pointsRegisters chan []string, resultsRegister
 		sumLocalVariation += math.Pow(distances[i].distanceToCenter-meanDistance, 2)
 	}
 
-	variance := sumLocalVariation / (float64(e.k) - 1)
+	variance := sumLocalVariation / (float64(e.globalVars.NumberOfPoints) - 1)
 	stdDeviation := math.Sqrt(variance)
 
 	for i := range distances {
 		csv_string := fmt.Sprintf("%d,%d,%d,%d,%f,%d,%f,%f,%f",
 			1,
-			e.k,
+			e.globalVars.NumberOfPoints,
 			e.r,
 			rid,
-			e.radius,
-			e.seed,
+			e.globalVars.Radius,
+			e.globalVars.Seed,
 			distances[i].Point.X,
 			distances[i].Point.Y,
 			distances[i].distanceToCenter,
@@ -147,11 +147,11 @@ func (e *experiment) Run(rid int, pointsRegisters chan []string, resultsRegister
 
 	csv_string := fmt.Sprintf("%d,%d,%d,%d,%f,%d,%f,%f,%f",
 		1,
-		e.k,
+		e.globalVars.NumberOfPoints,
 		e.r,
 		rid,
-		e.radius,
-		e.seed,
+		e.globalVars.Radius,
+		e.globalVars.Seed,
 		meanDistance,
 		variance,
 		stdDeviation,

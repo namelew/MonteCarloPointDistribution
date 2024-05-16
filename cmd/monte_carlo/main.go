@@ -69,15 +69,17 @@ func main() {
 
 	for i := 0; i < int(*powOfExperiments); i++ {
 		go experiment.Run(
-			uint16(*numberOfPoints),
+			&experiment.GlobalOptions{
+				NumberOfPoints: uint16(*numberOfPoints),
+				Seed:           uint32(*seed),
+				CType:          distance.CoordinationType(*coordinationsType),
+				Radius:         *radius,
+				RNG:            random,
+			},
 			uint8(i+1),
-			uint32(*seed),
-			distance.CoordinationType(*coordinationsType),
-			*radius,
 			&wg,
 			PRChannel,
 			RRChannel,
-			random,
 		)
 	}
 
