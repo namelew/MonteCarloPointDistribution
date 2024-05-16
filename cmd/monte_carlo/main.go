@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"sync"
 	"time"
@@ -60,6 +61,8 @@ func main() {
 	pointsRegisters := make([][]string, 0)
 	resultsRegisters := make([][]string, 0)
 
+	random := rand.New(rand.NewSource(int64(*seed)))
+
 	for i := 0; i < int(*powOfExperiments); i++ {
 		go experiment.Run(
 			uint16(*numberOfPoints),
@@ -69,6 +72,7 @@ func main() {
 			&wg,
 			&pointsRegisters,
 			&resultsRegisters,
+			random,
 		)
 	}
 

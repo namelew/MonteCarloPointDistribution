@@ -10,9 +10,7 @@ type Point struct {
 	Y float64
 }
 
-func EuclidianPoint(seed uint32, r, a, b float64) Point {
-	random := rand.New(rand.NewSource(int64(seed)))
-
+func EuclidianPoint(random *rand.Rand, r, a, b float64) Point {
 	randomRadius := r * math.Sqrt(random.Float64())
 	randomAngle := random.Float64() * 2 * math.Pi
 

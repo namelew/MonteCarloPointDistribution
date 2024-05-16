@@ -11,12 +11,13 @@ import (
 )
 
 type experiment struct {
-	r      uint8
-	k      uint16
-	seed   uint32
-	radius float64
-	wg     *sync.WaitGroup
-	mutex  *sync.Mutex
+	r                     uint8
+	k                     uint16
+	seed                  uint32
+	randomNumberGenerator *rand.Rand
+	radius                float64
+	wg                    *sync.WaitGroup
+	mutex                 *sync.Mutex
 }
 
 type sample struct {
@@ -30,7 +31,7 @@ func (s *sample) inValid(radius float64) bool {
 	return s.distanceToCenter <= radius
 }
 
-func Run(k uint16, r uint8, seed uint32, radius float64, wg *sync.WaitGroup, pointsRegisters *[][]string, resultsRegisters *[][]string) {
+func Run(k uint16, r uint8, seed uint32, radius float64, wg *sync.WaitGroup, pointsRegisters *[][]string, resultsRegisters *[][]string, randomNumberGenerator *rand.Rand) {
 	defer wg.Done()
 
 	numberOfRuns := int(math.Pow10(int(r)))
@@ -45,12 +46,13 @@ func Run(k uint16, r uint8, seed uint32, radius float64, wg *sync.WaitGroup, poi
 
 	for i := 0; i < numberOfRuns; i++ {
 		current := experiment{
-			r:      r,
-			k:      k,
-			seed:   seed,
-			radius: radius,
-			wg:     &wgRuns,
-			mutex:  &mutexRuns,
+			r:                     r,
+			k:                     k,
+			seed:                  seed,
+			randomNumberGenerator: randomNumberGenerator,
+			radius:                radius,
+			wg:                    &wgRuns,
+			mutex:                 &mutexRuns,
 		}
 
 		go current.Run(PRChannel, RRChannel)
@@ -91,12 +93,10 @@ func (e *experiment) Run(pointsRegisters chan []string, resultsRegisters chan []
 	distances := make([]*sample, e.k)
 	var sumPointDistance float64 = 0
 
-	randomNumberGenerator := rand.New(rand.NewSource(int64(e.seed)))
-
 	for i := range distances {
 		point := distance.Point{
-			X: randomNumberGenerator.Float64(),
-			Y: randomNumberGenerator.Float64(),
+			X: e.randomNumberGenerator.Float64(),
+			Y: e.randomNumberGenerator.Float64(),
 		}
 
 		new := sample{
@@ -111,8 +111,8 @@ func (e *experiment) Run(pointsRegisters chan []string, resultsRegisters chan []
 			}
 
 			point := distance.Point{
-				X: randomNumberGenerator.Float64(),
-				Y: randomNumberGenerator.Float64(),
+				X: e.randomNumberGenerator.Float64(),
+				Y: e.randomNumberGenerator.Float64(),
 			}
 
 			new = sample{
