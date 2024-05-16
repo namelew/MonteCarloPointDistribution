@@ -48,13 +48,13 @@ func main() {
 	pointsWriter := csv.NewWriter(points_file)
 	resultsWriter := csv.NewWriter(results_file)
 
-	err = pointsWriter.Write([]string{"scenario", "number-of-points(k)", "number-of-runs(r)", "radius", "seed", "x", "y", "distance"})
+	err = pointsWriter.Write([]string{"scenario", "number-of-points(k)", "number-of-runs(r)", "run-id(rid)", "radius", "seed", "x", "y", "distance"})
 
 	if err != nil {
 		log.Fatal("Unable to write point line on points file: ", err)
 	}
 
-	err = resultsWriter.Write([]string{"scenario", "number-of-points(k)", "number-of-runs(r)", "radius", "seed", "mean", "variance", "stdDeviation"})
+	err = resultsWriter.Write([]string{"scenario", "number-of-points(k)", "number-of-runs(r)", "run-id(rid)", "radius", "seed", "mean", "variance", "stdDeviation"})
 
 	if err != nil {
 		log.Fatal("Unable to write point line on points file: ", err)

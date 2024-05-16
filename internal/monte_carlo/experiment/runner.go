@@ -14,6 +14,7 @@ type experiment struct {
 	r                     uint8
 	k                     uint16
 	seed                  uint32
+	ctype                 distance.CoordinationType
 	randomNumberGenerator *rand.Rand
 	radius                float64
 	wg                    *sync.WaitGroup
@@ -31,7 +32,7 @@ func (s *sample) inValid(radius float64) bool {
 	return s.distanceToCenter <= radius
 }
 
-func Run(k uint16, r uint8, seed uint32, ctype distance.CoordinationType,  radius float64, wg *sync.WaitGroup, PRChannel chan []string, RRChannel chan []string, randomNumberGenerator *rand.Rand) {
+func Run(k uint16, r uint8, seed uint32, ctype distance.CoordinationType, radius float64, wg *sync.WaitGroup, PRChannel chan []string, RRChannel chan []string, rgn *rand.Rand) {
 	defer wg.Done()
 
 	numberOfRuns := int(math.Pow10(int(r)))
@@ -41,54 +42,42 @@ func Run(k uint16, r uint8, seed uint32, ctype distance.CoordinationType,  radiu
 
 	wgRuns.Add(numberOfRuns)
 
-	for i := 0; i < numberOfRuns; i++ {
-		current := experiment{
-			r:                     r,
-			k:                     k,
-			seed:                  seed,
-			ctype:  ctype,
-			randomNumberGenerator: randomNumberGenerator,
-			radius:                radius,
-			wg:                    &wgRuns,
-			mutex:                 &mutexRuns,
-		}
+	current := experiment{
+		r:                     r,
+		k:                     k,
+		seed:                  seed,
+		ctype:                 ctype,
+		randomNumberGenerator: rgn,
+		radius:                radius,
+		wg:                    &wgRuns,
+		mutex:                 &mutexRuns,
+	}
 
-		go current.Run(PRChannel, RRChannel)
+	for i := 0; i < numberOfRuns; i++ {
+		go current.Run(i, PRChannel, RRChannel)
 	}
 
 	wgRuns.Wait()
 }
 
-func (e *experiment) Run(pointsRegisters chan []string, resultsRegisters chan []string) {
+func (e *experiment) Run(rid int, pointsRegisters chan []string, resultsRegisters chan []string) {
 	defer e.wg.Done()
 
 	distances := make([]*sample, e.k)
 	var sumPointDistance float64 = 0
 
 	for i := range distances {
-		point := distance.Point{
-			X: e.randomNumberGenerator.Float64(),
-			Y: e.randomNumberGenerator.Float64(),
-		}
 
-		new := sample{
-			Point:            point,
-			distanceToCenter: distance.EuclidianDistance(point, CIRCLE_CENTER),
-		}
-
-		// Validation Step
-		for {
-			if new.inValid(e.radius) {
-				break
-			}
 		var new sample
 
 		switch e.ctype {
 		case distance.EUCLIDIAN:
+			e.mutex.Lock()
 			point := distance.Point{
 				X: e.randomNumberGenerator.Float64(),
 				Y: e.randomNumberGenerator.Float64(),
 			}
+			e.mutex.Unlock()
 
 			new = sample{
 				Point:            point,
@@ -100,10 +89,12 @@ func (e *experiment) Run(pointsRegisters chan []string, resultsRegisters chan []
 					break
 				}
 
+				e.mutex.Lock()
 				point := distance.Point{
-					X: randomNumberGenerator.Float64(),
-					Y: randomNumberGenerator.Float64(),
+					X: e.randomNumberGenerator.Float64(),
+					Y: e.randomNumberGenerator.Float64(),
 				}
+				e.mutex.Unlock()
 
 				new = sample{
 					Point:            point,
@@ -111,7 +102,9 @@ func (e *experiment) Run(pointsRegisters chan []string, resultsRegisters chan []
 				}
 			}
 		case distance.POLAR:
-			point := distance.PolarPoint(e.seed, e.radius, CIRCLE_CENTER.X, CIRCLE_CENTER.Y)
+			e.mutex.Lock()
+			point := distance.PolarPoint(e.randomNumberGenerator, e.radius, CIRCLE_CENTER.X, CIRCLE_CENTER.Y)
+			e.mutex.Unlock()
 
 			new = sample{
 				Point:            point,
@@ -135,10 +128,11 @@ func (e *experiment) Run(pointsRegisters chan []string, resultsRegisters chan []
 	stdDeviation := math.Sqrt(variance)
 
 	for i := range distances {
-		csv_string := fmt.Sprintf("%d,%d,%d,%f,%d,%f,%f,%f",
+		csv_string := fmt.Sprintf("%d,%d,%d,%d,%f,%d,%f,%f,%f",
 			1,
 			e.k,
 			e.r,
+			rid,
 			e.radius,
 			e.seed,
 			distances[i].Point.X,
@@ -151,10 +145,11 @@ func (e *experiment) Run(pointsRegisters chan []string, resultsRegisters chan []
 		pointsRegisters <- register
 	}
 
-	csv_string := fmt.Sprintf("%d,%d,%d,%f,%d,%f,%f,%f",
+	csv_string := fmt.Sprintf("%d,%d,%d,%d,%f,%d,%f,%f,%f",
 		1,
 		e.k,
 		e.r,
+		rid,
 		e.radius,
 		e.seed,
 		meanDistance,
