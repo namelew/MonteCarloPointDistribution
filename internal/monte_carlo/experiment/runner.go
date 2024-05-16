@@ -14,6 +14,7 @@ type experiment struct {
 	r      uint8
 	k      uint16
 	seed   uint32
+	ctype  distance.CoordinationType
 	radius float64
 	wg     *sync.WaitGroup
 	mutex  *sync.Mutex
@@ -30,7 +31,7 @@ func (s *sample) inValid(radius float64) bool {
 	return s.distanceToCenter <= radius
 }
 
-func Run(k uint16, r uint8, seed uint32, radius float64, wg *sync.WaitGroup, PRChannel chan []string, RRChannel chan []string) {
+func Run(k uint16, r uint8, seed uint32, ctype distance.CoordinationType, radius float64, wg *sync.WaitGroup, PRChannel chan []string, RRChannel chan []string) {
 	defer wg.Done()
 
 	numberOfRuns := int(math.Pow10(int(r)))
@@ -45,6 +46,7 @@ func Run(k uint16, r uint8, seed uint32, radius float64, wg *sync.WaitGroup, PRC
 			r:      r,
 			k:      k,
 			seed:   seed,
+			ctype:  ctype,
 			radius: radius,
 			wg:     &wgRuns,
 			mutex:  &mutexRuns,
@@ -65,26 +67,37 @@ func (e *experiment) Run(pointsRegisters chan []string, resultsRegisters chan []
 	randomNumberGenerator := rand.New(rand.NewSource(int64(e.seed)))
 
 	for i := range distances {
-		point := distance.Point{
-			X: randomNumberGenerator.Float64(),
-			Y: randomNumberGenerator.Float64(),
-		}
+		var new sample
 
-		new := sample{
-			Point:            point,
-			distanceToCenter: distance.EuclidianDistance(point, CIRCLE_CENTER),
-		}
-
-		// Validation Step
-		for {
-			if new.inValid(e.radius) {
-				break
-			}
-
+		switch e.ctype {
+		case distance.EUCLIDIAN:
 			point := distance.Point{
 				X: randomNumberGenerator.Float64(),
 				Y: randomNumberGenerator.Float64(),
 			}
+
+			new = sample{
+				Point:            point,
+				distanceToCenter: distance.EuclidianDistance(point, CIRCLE_CENTER),
+			}
+			// Validation Step
+			for {
+				if new.inValid(e.radius) {
+					break
+				}
+
+				point := distance.Point{
+					X: randomNumberGenerator.Float64(),
+					Y: randomNumberGenerator.Float64(),
+				}
+
+				new = sample{
+					Point:            point,
+					distanceToCenter: distance.EuclidianDistance(point, CIRCLE_CENTER),
+				}
+			}
+		case distance.POLAR:
+			point := distance.PolarPoint(e.seed, e.radius, CIRCLE_CENTER.X, CIRCLE_CENTER.Y)
 
 			new = sample{
 				Point:            point,
