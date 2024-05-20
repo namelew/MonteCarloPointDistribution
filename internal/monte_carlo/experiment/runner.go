@@ -2,6 +2,7 @@ package experiment
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"math/rand"
 	"strings"
@@ -35,6 +36,8 @@ var CIRCLE_CENTER = distance.Point{X: 0, Y: 0}
 func Run(global *GlobalOptions, r uint8, wg *sync.WaitGroup, PRChannel chan []string, RRChannel chan []string) {
 	defer wg.Done()
 
+	log.Printf("Starting Simulation...\n\tscenario:%d\n\tr: %d\n\tk:%d", global.CType, r, global.NumberOfPoints)
+
 	numberOfRuns := int(math.Pow10(int(r)))
 
 	wgRuns := sync.WaitGroup{}
@@ -54,6 +57,7 @@ func Run(global *GlobalOptions, r uint8, wg *sync.WaitGroup, PRChannel chan []st
 	}
 
 	wgRuns.Wait()
+	log.Printf("Finishing Simulation...\n\tscenario:%d\n\tr: %d\n\tk:%d", global.CType, r, global.NumberOfPoints)
 }
 
 func (e *experiment) Run(rid int, pointsRegisters chan []string, resultsRegisters chan []string) {
@@ -103,11 +107,10 @@ func (e *experiment) Run(rid int, pointsRegisters chan []string, resultsRegister
 	stdDeviation := math.Sqrt(variance)
 
 	for i := range distances {
-		csv_string := fmt.Sprintf("%d,%d,%d,%d,%f,%d,%f,%f,%f",
-			1,
+		csv_string := fmt.Sprintf("%d,%d,%d,%f,%d,%f,%f,%f",
+			e.globalVars.CType,
 			e.globalVars.NumberOfPoints,
 			e.r,
-			rid,
 			e.globalVars.Radius,
 			e.globalVars.Seed,
 			distances[i].Point.X,
@@ -120,13 +123,21 @@ func (e *experiment) Run(rid int, pointsRegisters chan []string, resultsRegister
 		pointsRegisters <- register
 	}
 
-	csv_string := fmt.Sprintf("%d,%d,%d,%d,%f,%d,%f,%f,%f",
-		1,
+	csv_string := fmt.Sprintf("%d,%d,%d,%f,%d,%f,%f,%f",
+		e.globalVars.CType,
 		e.globalVars.NumberOfPoints,
 		e.r,
-		rid,
 		e.globalVars.Radius,
 		e.globalVars.Seed,
+		meanDistance,
+		variance,
+		stdDeviation,
+	)
+
+	log.Printf("Execution %d of Scenario %d and R %d finished. \n\tmean:%f\n\tvariance:%f\n\tstdDeviation:%f\n.",
+		rid,
+		e.globalVars.CType,
+		e.r,
 		meanDistance,
 		variance,
 		stdDeviation,
