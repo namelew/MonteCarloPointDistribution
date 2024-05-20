@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"os"
 	"sync"
@@ -45,16 +46,32 @@ func main() {
 		log.Fatal("Unable to create simulation points file: ", err)
 	}
 
+	pointsMemThreshould := 0
+
+	for i := 0; i < int(*powOfExperiments); i++ {
+		pointsMemThreshould += int(math.Pow10(i+1)) * int(*numberOfPoints)
+	}
+
+	pointsMemThreshould = int(math.Floor(float64(pointsMemThreshould) * 0.1))
+
+	resultsMemThreshould := 0
+
+	for i := 0; i < int(*powOfExperiments); i++ {
+		resultsMemThreshould += int(math.Pow10(i + 1))
+	}
+
+	resultsMemThreshould = int(math.Floor(float64(resultsMemThreshould) * 0.1))
+
 	pointsWriter := csv.NewWriter(points_file)
 	resultsWriter := csv.NewWriter(results_file)
 
-	err = pointsWriter.Write([]string{"scenario", "number-of-points(k)", "number-of-runs(r)", "run-id(rid)", "radius", "seed", "x", "y", "distance"})
+	err = pointsWriter.Write([]string{"scenario", "number-of-points(k)", "number-of-runs(r)", "radius", "seed", "x", "y", "distance"})
 
 	if err != nil {
 		log.Fatal("Unable to write point line on points file: ", err)
 	}
 
-	err = resultsWriter.Write([]string{"scenario", "number-of-points(k)", "number-of-runs(r)", "run-id(rid)", "radius", "seed", "mean", "variance", "stdDeviation"})
+	err = resultsWriter.Write([]string{"scenario", "number-of-points(k)", "number-of-runs(r)", "radius", "seed", "mean", "variance", "stdDeviation"})
 
 	if err != nil {
 		log.Fatal("Unable to write point line on points file: ", err)
@@ -96,6 +113,19 @@ func main() {
 	go func() {
 		for point := range PRChannel {
 			pointsRegisters = append(pointsRegisters, point)
+
+			if len(pointsRegisters) >= pointsMemThreshould {
+				err = pointsWriter.WriteAll(pointsRegisters)
+
+				if err != nil {
+					log.Fatal("Unable to write point line on points file: ", err)
+					return
+				}
+
+				pointsWriter.Flush()
+
+				pointsRegisters = make([][]string, 0)
+			}
 		}
 		wgCollectors.Done()
 	}()
@@ -103,6 +133,19 @@ func main() {
 	go func() {
 		for result := range RRChannel {
 			resultsRegisters = append(resultsRegisters, result)
+
+			if len(resultsRegisters) >= resultsMemThreshould {
+				err = resultsWriter.WriteAll(resultsRegisters)
+
+				if err != nil {
+					log.Fatal("Unable to write point line on points file: ", err)
+					return
+				}
+
+				resultsWriter.Flush()
+
+				resultsRegisters = make([][]string, 0)
+			}
 		}
 
 		wgCollectors.Done()
