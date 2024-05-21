@@ -17,11 +17,13 @@ import (
 
 func main() {
 	var (
-		numberOfPoints    = flag.Uint("k", 300, "Number of points that will be generate on each experiment")
-		coordinationsType = flag.Uint("t", uint(distance.EUCLIDIAN), "Type of coordinations that will be used to generate points in the circle")
-		powOfExperiments  = flag.Uint("r", 6, "Greater exponent of the base 10 potency that set the number of runs on each experiment")
-		radius            = flag.Float64("radius", 0.5, "Radius of the ring that will contain all points")
-		seed              = flag.Uint("seed", uint(time.Now().Nanosecond()), "Seed value to generate the experiments")
+		numberOfPoints       = flag.Uint("k", 300, "Number of points that will be generate on each experiment")
+		coordinationsType    = flag.Uint("t", uint(distance.EUCLIDIAN), "Type of coordinations that will be used to generate points in the circle")
+		powOfExperiments     = flag.Uint("r", 6, "Greater exponent of the base 10 potency that set the number of runs on each experiment")
+		radius               = flag.Float64("radius", 0.5, "Radius of the ring that will contain all points")
+		seed                 = flag.Uint("seed", uint(time.Now().Nanosecond()), "Seed value to generate the experiments")
+		pointsBufferMaxSize  = flag.Float64("points-buffer", 0.1, "Max number of points stored on main memory")
+		resultsBufferMaxSize = flag.Float64("results-buffer", 0.1, "Max number of points stored on main memory")
 	)
 
 	flag.Parse()
@@ -52,7 +54,7 @@ func main() {
 		pointsMemThreshould += int(math.Pow10(i+1)) * int(*numberOfPoints)
 	}
 
-	pointsMemThreshould = int(math.Floor(float64(pointsMemThreshould) * 0.1))
+	pointsMemThreshould = int(math.Floor(float64(pointsMemThreshould) * *pointsBufferMaxSize))
 
 	resultsMemThreshould := 0
 
@@ -60,7 +62,7 @@ func main() {
 		resultsMemThreshould += int(math.Pow10(i + 1))
 	}
 
-	resultsMemThreshould = int(math.Floor(float64(resultsMemThreshould) * 0.1))
+	resultsMemThreshould = int(math.Floor(float64(resultsMemThreshould) * *resultsBufferMaxSize))
 
 	pointsWriter := csv.NewWriter(points_file)
 	resultsWriter := csv.NewWriter(results_file)
