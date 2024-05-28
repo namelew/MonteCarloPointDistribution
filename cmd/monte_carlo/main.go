@@ -92,7 +92,7 @@ func main() {
 				NumberOfPoints: uint16(*numberOfPoints),
 				Seed:           uint32(*seed),
 				CType:          distance.CoordinationType(*coordinationsType),
-				Radius:         *radius,
+				Radius:         float32(*radius),
 				RNG:            random,
 			},
 			uint8(i+1),

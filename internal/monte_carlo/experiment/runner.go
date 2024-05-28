@@ -14,7 +14,7 @@ import (
 type GlobalOptions struct {
 	NumberOfPoints uint16
 	Seed           uint32
-	Radius         float64
+	Radius         float32
 	CType          distance.CoordinationType
 	RNG            *rand.Rand
 }
@@ -28,7 +28,7 @@ type experiment struct {
 
 type sample struct {
 	distance.Point
-	distanceToCenter float64
+	distanceToCenter float32
 }
 
 var CIRCLE_CENTER = distance.Point{X: 0, Y: 0}
@@ -64,7 +64,7 @@ func (e *experiment) Run(rid int, pointsRegisters chan []string, resultsRegister
 	defer e.wg.Done()
 
 	distances := make([]*sample, e.globalVars.NumberOfPoints)
-	var sumPointDistance float64 = 0
+	var sumPointDistance float32 = 0
 
 	for i := range distances {
 
@@ -76,6 +76,12 @@ func (e *experiment) Run(rid int, pointsRegisters chan []string, resultsRegister
 			point := distance.EuclidianPoint(e.globalVars.RNG, e.globalVars.Radius, CIRCLE_CENTER.X, CIRCLE_CENTER.Y)
 			e.mutex.Unlock()
 
+			for distance.EuclidianDistance(point, CIRCLE_CENTER) == 0 {
+				e.mutex.Lock()
+				point = distance.EuclidianPoint(e.globalVars.RNG, e.globalVars.Radius, CIRCLE_CENTER.X, CIRCLE_CENTER.Y)
+				e.mutex.Unlock()
+			}
+
 			new = sample{
 				Point:            point,
 				distanceToCenter: distance.EuclidianDistance(point, CIRCLE_CENTER),
@@ -84,6 +90,12 @@ func (e *experiment) Run(rid int, pointsRegisters chan []string, resultsRegister
 			e.mutex.Lock()
 			point := distance.PolarPoint(e.globalVars.RNG, e.globalVars.Radius, CIRCLE_CENTER.X, CIRCLE_CENTER.Y)
 			e.mutex.Unlock()
+
+			for distance.EuclidianDistance(point, CIRCLE_CENTER) == 0 {
+				e.mutex.Lock()
+				point = distance.PolarPoint(e.globalVars.RNG, e.globalVars.Radius, CIRCLE_CENTER.X, CIRCLE_CENTER.Y)
+				e.mutex.Unlock()
+			}
 
 			new = sample{
 				Point:            point,
@@ -95,16 +107,16 @@ func (e *experiment) Run(rid int, pointsRegisters chan []string, resultsRegister
 		sumPointDistance += new.distanceToCenter
 	}
 
-	meanDistance := sumPointDistance / float64(e.globalVars.NumberOfPoints)
+	meanDistance := sumPointDistance / float32(e.globalVars.NumberOfPoints)
 
-	var sumLocalVariation float64 = 0.0
+	var sumLocalVariation float32 = 0.0
 
 	for i := range distances {
-		sumLocalVariation += math.Pow(distances[i].distanceToCenter-meanDistance, 2)
+		sumLocalVariation += float32(math.Pow(float64(distances[i].distanceToCenter-meanDistance), 2))
 	}
 
-	variance := sumLocalVariation / (float64(e.globalVars.NumberOfPoints) - 1)
-	stdDeviation := math.Sqrt(variance)
+	variance := sumLocalVariation / (float32(e.globalVars.NumberOfPoints) - 1)
+	stdDeviation := float32(math.Sqrt(float64(variance)))
 
 	for i := range distances {
 		csv_string := fmt.Sprintf("%d,%d,%d,%f,%d,%f,%f,%f",
